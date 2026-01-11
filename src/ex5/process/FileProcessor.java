@@ -36,7 +36,7 @@ public class FileProcessor {
     private static final String METHOD_DECLARATION = "\\s*void\\s+(?<name>" + NAME + ")\\s*\\([^)]*\\)" +
             "\\s*\\{";
     private static final String VARIABLE_DECLARATION = "\\s*(final\\s+)?(?<type>" + TYPE + ")\\s+(?<name>"
-            + NAME + ")\\s*;\\s*";
+            + NAME + ")\\s*(=\\s*[^;]*);\\s*";
     private static final String PARAMETER_DECLARATION = "\\s*(final\\s*)?(?<type>" + TYPE + ")\\s+(?<name>"
             + NAME + ")\\s*";
     private static final String INT_VAL = "[+-]?\\d+";
@@ -49,6 +49,7 @@ public class FileProcessor {
     private static final String OPEN_SCOPE = "{";
     private static final String CLOSE_SCOPE = "}";
     private static final String RETURN = "\\s*return\\s*;\\s*";
+    //private static final String
 
     private static final String NAME_GROUP = "name";
     private static final String TYPE_GROUP = "type";
@@ -81,7 +82,7 @@ public class FileProcessor {
     }
 
 
-    private void findFuncAndGlobalVars() throws IOException{
+    private void findFuncAndGlobalVars() throws Exception {
         int depth = 0;
         //fileReader.reset();
         BufferedReader bufferedReader = new BufferedReader(fileReader);
@@ -107,7 +108,17 @@ public class FileProcessor {
                 if (matcher.matches())
                     continue;
                 matcher = varPattern.matcher(line);
-                createVariableInfo(globalVars, line, matcher);
+                if (matcher.matches()) {
+                    String varType = matcher.group(TYPE_GROUP);
+                    String varName = matcher.group(NAME_GROUP);
+                    boolean isFinal = finalPattern.matcher(line).find();
+                    boolean didAssign = line.contains("=");
+                    if (didAssign){
+                        varAssignmentCheck(varType, line.substring(line.indexOf('=')+1));
+                    }
+                    VariableInfo variableInfo = new VariableInfo(varName, varType, isFinal, didAssign);
+                    globalVars.add(variableInfo);
+                }
             }
         }
     }
