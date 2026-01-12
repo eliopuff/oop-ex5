@@ -31,11 +31,8 @@ public class VariableInfo {
 
     @Override
     public String toString() {
-        return "VariableInfo{" +
-                "name='" + name + '\'' +
-                ", type='" + type + '\'' +
-                ", isFinal=" + isFinal +
-                ", didAssign=" + didAssign +
-                '}';
+        String finalStr = isFinal ? "final " : "";
+        String assignStr = didAssign ? "assigned" : "unassigned";
+        return "VariableInfo{" + finalStr + type + " " + name + ", " + assignStr + "}";
     }
 }

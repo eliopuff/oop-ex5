@@ -19,12 +19,16 @@ public class FunctionInfo {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Function Name: ").append(name).append("\n");
-        sb.append("Parameters:\n");
+        StringBuilder paramsStr = new StringBuilder();
         for (VariableInfo param : parameters) {
-            sb.append("  - ").append(param.toString()).append("\n");
+            paramsStr.append(param.toString()).append(", ");
         }
-        return sb.toString();
+        if (!paramsStr.isEmpty()) {
+            paramsStr.setLength(paramsStr.length() - 2); // Remove trailing comma and space
+        }
+        return "FunctionInfo{" +
+                "'" + name + '\'' +
+                "Params:" + paramsStr +
+                "}";
     }
 }

@@ -32,13 +32,18 @@ public class Sjavac {
         }
         String sourceCode = args[0];
         try(FileReader fileReader = new FileReader(sourceCode)) {
-            FileProcessor processor = new FileProcessor(fileReader);
+            FileProcessor processor = new FileProcessor(fileReader, sourceCode);
             processor.processFile();
             System.out.println(LEGAL_PRINT);
         }
         catch (IOException e) {
             e.printStackTrace();
             System.out.println(IO_ERROR_PRINT);
+            System.err.println(e.getMessage());
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("ERROR_PRINT");
             System.err.println(e.getMessage());
         }
     }
