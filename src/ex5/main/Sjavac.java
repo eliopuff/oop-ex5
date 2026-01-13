@@ -32,7 +32,7 @@ public class Sjavac {
         }
         String sourceCode = args[0];
         try(FileReader fileReader = new FileReader(sourceCode)) {
-            FileProcessor processor = new FileProcessor(fileReader, sourceCode);
+            FileProcessor processor = new FileProcessor(fileReader);
             processor.processFile();
             System.out.println(LEGAL_PRINT);
         }

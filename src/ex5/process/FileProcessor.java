@@ -17,7 +17,7 @@ public class FileProcessor {
 
 
     private final Pattern varDeclarationPattern;
-    private FileReader fileReader;
+    private final FileReader fileReader;
     private final Pattern argsPattern;
     private final Pattern finalPattern;
     private final Pattern commentPattern;
@@ -30,6 +30,7 @@ public class FileProcessor {
     private final Pattern functionCallPattern;
     private final Pattern functionDefinitionPattern;
     private final Pattern ifWhilePattern;
+    private final Pattern returnPattern;
     private final List<FunctionInfo> functions;
     private final Deque<List<VariableInfo>> variables;
     private List<String> fileContents;
@@ -87,6 +88,7 @@ public class FileProcessor {
         charValPattern = Pattern.compile(CHAR_VAL);
         stringValPattern = Pattern.compile(STRING_VAL);
         namePattern = Pattern.compile(NAME);
+        returnPattern = Pattern.compile(RETURN);
         ifWhilePattern = Pattern.compile(IF_WHILE_CONDITION);
         functionCallPattern = Pattern.compile("(?<name>"+NAME+ ")\\s*\\([^)]\\)"); // Added pattern for
         functionDefinitionPattern = Pattern.compile(METHOD_DECLARATION);
@@ -133,10 +135,8 @@ public class FileProcessor {
     private void findFuncAndGlobalVars() throws Exception {
         int depth = 0;
         variables.push(new ArrayList<>());
-        BufferedReader bufferedReader = new BufferedReader(fileReader);
-        String line;
         Pattern funcPattern = Pattern.compile(METHOD_DECLARATION);
-        while ((line = bufferedReader.readLine()) != null) {
+        for (String line : fileContents) {
             line = line.trim();
             if (line.endsWith(OPEN_SCOPE)) {
                 Matcher matcher = funcPattern.matcher(line);
@@ -254,7 +254,6 @@ public class FileProcessor {
     }
 
     private void validateLegalCode() throws Exception {
-        BufferedReader bufferedReader = new BufferedReader(fileReader);
         for (int i = 0; i < fileContents.size(); i++) {
             String line = fileContents.get(i);
             line = line.trim();
@@ -271,14 +270,14 @@ public class FileProcessor {
                 if (curFunc == null) {
                     throw new Exception("Function not found: " + funcName + "in line: " + i + "\n" + line);
                 }
-                validateScope(i, curFunc.getParameters());
+                i = validateScope(i+1, curFunc.getParameters());
             }
         }
     }
 
-    private void validateScope(int ind, VariableInfo[] localVars) throws Exception {
+    private int validateScope(int ind, VariableInfo[] localVars) throws Exception {
         variables.push(new ArrayList<>(Arrays.asList(localVars)));
-        for (; (ind< fileContents.size()) && !fileContents.get(ind).equals(CLOSE_SCOPE); ind++) {
+        for (; (ind< fileContents.size()) && !fileContents.get(ind).trim().equals(CLOSE_SCOPE); ind++) {
             String line = fileContents.get(ind);
             line = line.trim();
             if (matchDeclaration(line)) {
@@ -291,7 +290,7 @@ public class FileProcessor {
                 continue;
             } else if (functionCallPattern.matcher(line).matches()) {
                 continue;
-            } else if (line.matches(RETURN)) {
+            } else if (returnPattern.matcher(line).matches()) {
                 continue;
             } else {
                 throw new Exception("Illegal statement in line: " + ind + "\n" + line);
@@ -302,6 +301,7 @@ public class FileProcessor {
                     fileContents.get(ind));
         }
         variables.pop();
+        return ind;
     }
 
     private boolean checkForAssignments(String line, int lineNum) throws Exception {
@@ -315,6 +315,10 @@ public class FileProcessor {
                 String varName = parts[0].trim();
                 String assignment = parts[1].trim();
                 VariableInfo targetVar = getVariableInfo(line, lineNum, varName);
+                if (targetVar.isFinal()) {
+                    throw new Exception("Cannot reassign final variable " + varName + " in line: " +
+                            lineNum + "\n" + line);
+                }
                 varAssignmentCheck(targetVar.getType(), assignment);
                 targetVar.setAssigned(true);
             }
