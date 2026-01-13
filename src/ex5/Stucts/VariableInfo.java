@@ -4,7 +4,7 @@ public class VariableInfo {
     private final String name;
     private final String type;
     private final boolean isFinal;
-    private final boolean didAssign;
+    private boolean didAssign;
 
     public VariableInfo(String name, String type, boolean isFinal, boolean didAssign) {
         this.name = name;
@@ -25,8 +25,12 @@ public class VariableInfo {
         return isFinal;
     }
 
-    public boolean isDidAssign() {
+    public boolean isAssigned() {
         return didAssign;
+    }
+
+    public void setAssigned(boolean didAssign) {
+        this.didAssign = didAssign;
     }
 
     @Override

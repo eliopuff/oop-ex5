@@ -7,7 +7,9 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.List;
+import java.util.LinkedList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,7 +18,6 @@ public class FileProcessor {
 
     private final Pattern varDeclarationPattern;
     private FileReader fileReader;
-    private final String sourceCode;
     private final Pattern argsPattern;
     private final Pattern finalPattern;
     private final Pattern commentPattern;
@@ -28,8 +29,10 @@ public class FileProcessor {
     private final Pattern namePattern;
     private final Pattern functionCallPattern;
     private final Pattern functionDefinitionPattern;
+    private final Pattern ifWhilePattern;
     private final List<FunctionInfo> functions;
-    private final List<VariableInfo> variables;
+    private final Deque<List<VariableInfo>> variables;
+    private List<String> fileContents;
 
 
     //RegEx constants
@@ -39,8 +42,8 @@ public class FileProcessor {
     private static final String NAME = "([a-zA-Z]|_[a-zA-Z0-9])\\w*";
     private static final String METHOD_DECLARATION = "\\s*void\\s+(?<name>" + NAME + ")\\s*\\([^)]*\\)" +
             "\\s*\\{";
-    private static final String VARIABLE_DECLARATION = "\\s*(final\\s+)?(?<type>" + TYPE + ")\\s+("
-            + NAME + "\\s*,\\s*)*"+NAME+"\\s*(=\\s*[^;]*)?;\\s*";
+    private static final String VARIABLE_DECLARATION = "\\s*(final\\s+)?(?<type>" + TYPE + ")\\s+"+
+            "(" + NAME + "\\s*(=[^,;]*)?,\\s*)*"+NAME+"\\s*(=[^,;]*)?;\\s*";
     private static final String PARAMETER_DECLARATION = "\\s*(final\\s*)?(?<type>" + TYPE + ")\\s+(?<name>"
             + NAME + ")\\s*";
     private static final String INT_VAL = "[+-]?\\d+";
@@ -53,18 +56,28 @@ public class FileProcessor {
     private static final String OPEN_SCOPE = "{";
     private static final String CLOSE_SCOPE = "}";
     private static final String RETURN = "\\s*return\\s*;\\s*";
-    //private static final String
+    private static final String IF_WHILE_CONDITION = "\\s*(if|while)\\s*\\(.*\\)\\s*\\{";
+    private static final String ASSIGNMENT = "\\s+(" + NAME + "\\s*=[^,;]*,\\s*)*"
+            + NAME +"\\s*=[^,;]*;\\s*";
+
 
     private static final String NAME_GROUP = "name";
     private static final String TYPE_GROUP = "type";
     private static final String FINAL = "final";
+    private static final String INT = "int";
+    private static final String DOUBLE = "double";
+    private static final String BOOLEAN = "boolean";
+    private static final String CHAR = "char";
+    private static final String STRING = "String";
+    private static final String COMMA = ",";
+    private static final String SEMICOLON = ";";
+    private static final String ASSIGN_OP = "=";
 
 
-    public FileProcessor(FileReader fileReader, String sourceCode) {
-        this.fileReader = fileReader;
-        this.sourceCode = sourceCode;
+    public FileProcessor(FileReader fileReader) {
+        this.fileReader= fileReader;
         functions = new ArrayList<>();
-        variables = new ArrayList<>();
+        variables = new LinkedList<>();
         finalPattern = Pattern.compile(FINAL);
         commentPattern = Pattern.compile(COMMENT);
         argsPattern = Pattern.compile(PARAMETER_DECLARATION);
@@ -74,6 +87,7 @@ public class FileProcessor {
         charValPattern = Pattern.compile(CHAR_VAL);
         stringValPattern = Pattern.compile(STRING_VAL);
         namePattern = Pattern.compile(NAME);
+        ifWhilePattern = Pattern.compile(IF_WHILE_CONDITION);
         functionCallPattern = Pattern.compile("(?<name>"+NAME+ ")\\s*\\([^)]\\)"); // Added pattern for
         functionDefinitionPattern = Pattern.compile(METHOD_DECLARATION);
         // function
@@ -83,22 +97,18 @@ public class FileProcessor {
     }
 
     public void processFile() throws Exception {
+        BufferedReader bufferedReader = new BufferedReader(fileReader);
+        fileContents = bufferedReader.lines().toList();
         validateScopesAndColons();
-        this.fileReader.close();
-        this.fileReader = new FileReader(sourceCode); // Resetting the FileReader
         findFuncAndGlobalVars();
         System.out.println(functions);
         System.out.println(variables);
-        this.fileReader.close();
-        this.fileReader = new FileReader(sourceCode);
         validateLegalCode();
     }
 
     public void validateScopesAndColons() throws Exception {
         int scopeCount = 0;
-        BufferedReader bufferedReader = new BufferedReader(fileReader);
-        String line;
-        while ((line = bufferedReader.readLine()) != null) {
+        for (String line : fileContents) {
             line = line.trim();
             if (line.isEmpty()) {
                 continue;
@@ -111,7 +121,7 @@ public class FileProcessor {
                 }
             } else if (line.startsWith(COMMENT_PREFIX)){
                     continue;
-            } else if (!line.endsWith(";") &&
+            } else if (!line.endsWith(SEMICOLON) &&
                     !line.endsWith(OPEN_SCOPE) && !line.endsWith(CLOSE_SCOPE) &&
                     !functionCallPattern.matcher(line).matches()) {
                 throw new Exception("Missing semicolon at the end of line: " + line);
@@ -122,7 +132,7 @@ public class FileProcessor {
 
     private void findFuncAndGlobalVars() throws Exception {
         int depth = 0;
-        //fileReader.reset();
+        variables.push(new ArrayList<>());
         BufferedReader bufferedReader = new BufferedReader(fileReader);
         String line;
         Pattern funcPattern = Pattern.compile(METHOD_DECLARATION);
@@ -147,12 +157,8 @@ public class FileProcessor {
                 Matcher matcher = commentPattern.matcher(line);
                 if (matcher.matches())
                     continue;
-                matcher = varDeclarationPattern.matcher(line);
-                if (matcher.matches()) {
-                    String varType = matcher.group(TYPE_GROUP);
-                    boolean isFinal = finalPattern.matcher(line).find();
-                    variables.addAll(Arrays.asList(parseVariables(isFinal, varType,
-                            line.substring(line.indexOf(varType) + varType.length()))));
+                if (matchDeclaration(line)){
+                    continue;
                 } else if (line.isEmpty()) {
                     continue;
                 }else throw new Exception("Illegal global variable declaration: " + line);
@@ -160,15 +166,16 @@ public class FileProcessor {
         }
     }
 
-    private VariableInfo[] parseVariables(boolean isFinal, String varType ,String paramsString) throws Exception {
+    private VariableInfo[] parseVariables(boolean isFinal, String varType ,String paramsString)
+            throws Exception {
         if (paramsString.trim().isEmpty()) {
             return new VariableInfo[0];
         }
-        String withoutSemicolon = paramsString.substring(0, paramsString.indexOf(';'));
-        String[] paramsArray = withoutSemicolon.split(",");
+        String withoutSemicolon = paramsString.substring(0, paramsString.indexOf(SEMICOLON));
+        String[] paramsArray = withoutSemicolon.split(COMMA);
         List<VariableInfo> parameters = new ArrayList<>();
         for (String param : paramsArray) {
-            String[] parts = param.split("=");
+            String[] parts = param.split(ASSIGN_OP);
             String varName = parts[0].trim();
             boolean didAssign = parts.length > 1;
             if (didAssign){
@@ -177,7 +184,6 @@ public class FileProcessor {
             }
             VariableInfo variableInfo = new VariableInfo(varName, varType, isFinal, didAssign);
             parameters.add(variableInfo);
-
         }
         return parameters.toArray(new VariableInfo[0]);
     }
@@ -186,7 +192,7 @@ public class FileProcessor {
         if (paramsString.trim().isEmpty()) {
             return new VariableInfo[0];
         }
-        String[] paramsArray = paramsString.split(",");
+        String[] paramsArray = paramsString.split(COMMA);
         List<VariableInfo> parameters = new ArrayList<>();
         for (String param : paramsArray) {
             Matcher matcher = argsPattern.matcher(param);
@@ -203,31 +209,31 @@ public class FileProcessor {
 
     private void varAssignmentCheck(String type, String assignment) throws Exception {
         switch (type) {
-            case "int":
+            case INT:
                 Matcher intMatcher = intValPattern.matcher(assignment);
                 if (intMatcher.matches()) {
                     return;
                 }
                 break;
-            case "double":
+            case DOUBLE:
                 Matcher doubleMatcher = doubleValPattern.matcher(assignment);
                 if (doubleMatcher.matches()) {
                     return;
                 }
                 break;
-            case "boolean":
+            case BOOLEAN:
                 Matcher boolMatcher = boolValPattern.matcher(assignment);
                 if (boolMatcher.matches()) {
                     return;
                 }
                 break;
-            case "char":
+            case CHAR:
                 Matcher charMatcher = charValPattern.matcher(assignment);
                 if (charMatcher.matches()) {
                     return;
                 }
                 break;
-            case "String":
+            case STRING:
                 Matcher stringMatcher = stringValPattern.matcher(assignment);
                 if (stringMatcher.matches()) {
                     return;
@@ -236,9 +242,11 @@ public class FileProcessor {
         }
         Matcher nameMatcher = namePattern.matcher(assignment);
         if (nameMatcher.matches()) {
-            for (VariableInfo var : variables) {
-                if (var.getName().equals(assignment) && var.getType().equals(type) && var.isDidAssign()) {
-                    return;
+            for (List<VariableInfo> scopeVars : variables) {
+                for (VariableInfo var : scopeVars) {
+                    if (var.getName().equals(assignment) && var.getType().equals(type) && var.isAssigned()) {
+                        return;
+                    }
                 }
             }
         }
@@ -247,8 +255,8 @@ public class FileProcessor {
 
     private void validateLegalCode() throws Exception {
         BufferedReader bufferedReader = new BufferedReader(fileReader);
-        String line;
-        while ((line = bufferedReader.readLine()) != null) {
+        for (int i = 0; i < fileContents.size(); i++) {
+            String line = fileContents.get(i);
             line = line.trim();
             Matcher matcher = functionDefinitionPattern.matcher(line);
             if (matcher.matches()){
@@ -260,24 +268,88 @@ public class FileProcessor {
                         break;
                     }
                 }
-                validateScope(bufferedReader, curFunc.getParameters());
+                if (curFunc == null) {
+                    throw new Exception("Function not found: " + funcName + "in line: " + i + "\n" + line);
+                }
+                validateScope(i, curFunc.getParameters());
             }
         }
     }
 
-    private void validateScope(BufferedReader bufferedReader, VariableInfo[] localVars) throws Exception {
-        String line;
-
-        while ((line = bufferedReader.readLine()) != null && !line.trim().equals("}")) {
+    private void validateScope(int ind, VariableInfo[] localVars) throws Exception {
+        variables.push(new ArrayList<>(Arrays.asList(localVars)));
+        for (; (ind< fileContents.size()) && !fileContents.get(ind).equals(CLOSE_SCOPE); ind++) {
+            String line = fileContents.get(ind);
             line = line.trim();
-            Matcher varMatcher = varDeclarationPattern.matcher(line);
-            if (varMatcher.matches()) {
-                String varType = varMatcher.group(TYPE_GROUP);
-                boolean isFinal = finalPattern.matcher(line).find();
-                VariableInfo[] vars = parseVariables(isFinal, varType,
-                        line.substring(line.indexOf(varType) + varType.length()));
-                for (VariableInfo var : vars) {
-
+            if (matchDeclaration(line)) {
+                continue;
+            } else if (line.isEmpty()) {
+                continue;
+            } else if (checkForAssignments(line, ind)) {
+                continue;
+            } else if (ifWhilePattern.matcher(line).matches()) {
+                continue;
+            } else if (functionCallPattern.matcher(line).matches()) {
+                continue;
+            } else if (line.matches(RETURN)) {
+                continue;
+            } else {
+                throw new Exception("Illegal statement in line: " + ind + "\n" + line);
+            }
         }
+        if (ind >= fileContents.size() || !fileContents.get(ind).equals(CLOSE_SCOPE)) {
+            throw new Exception("Missing closing brace for function scope in line: " + ind +"\n" +
+                    fileContents.get(ind));
+        }
+        variables.pop();
+    }
+
+    private boolean checkForAssignments(String line, int lineNum) throws Exception {
+        Pattern assignmentPattern = Pattern.compile(ASSIGNMENT);
+        Matcher assignmentMatcher = assignmentPattern.matcher(line);
+        if (assignmentMatcher.matches()) {
+            String withoutSemicolon = line.substring(0, line.indexOf(SEMICOLON));
+            String[] paramsArray = withoutSemicolon.split(COMMA);
+            for (String param : paramsArray) {
+                String[] parts = param.split(ASSIGN_OP);
+                String varName = parts[0].trim();
+                String assignment = parts[1].trim();
+                VariableInfo targetVar = getVariableInfo(line, lineNum, varName);
+                varAssignmentCheck(targetVar.getType(), assignment);
+                targetVar.setAssigned(true);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private VariableInfo getVariableInfo(String line, int lineNum, String varName) throws Exception {
+        VariableInfo targetVar = null;
+        for (List<VariableInfo> scopeVars : variables) {
+            for (VariableInfo var : scopeVars) {
+                if (var.getName().equals(varName)) {
+                    targetVar = var;
+                    break;
+                }
+            }
+        }
+        if (targetVar == null) {
+            throw new Exception("Variable " + varName + " not declared in line: " + lineNum + "\n"
+                    + line);
+        }
+        return targetVar;
+    }
+
+    private boolean matchDeclaration(String line) throws Exception {
+        Matcher varMatcher = varDeclarationPattern.matcher(line);
+        if (varMatcher.matches()) {
+            String varType = varMatcher.group(TYPE_GROUP);
+            boolean isFinal = finalPattern.matcher(line).find();
+            assert variables.peek() != null;
+            variables.peek().addAll(Arrays.asList(parseVariables(isFinal, varType,
+                    line.substring(line.indexOf(varType) + varType.length()))));
+            return true;
+        }
+        return false;
     }
 }
