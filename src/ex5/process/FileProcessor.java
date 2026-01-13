@@ -30,6 +30,7 @@ public class FileProcessor {
     private final Pattern functionCallPattern;
     private final Pattern functionDefinitionPattern;
     private final Pattern ifWhilePattern;
+    private final Pattern ifWhileConditionPattern;
     private final Pattern returnPattern;
     private final List<FunctionInfo> functions;
     private final Deque<List<VariableInfo>> variables;
@@ -57,11 +58,14 @@ public class FileProcessor {
     private static final String OPEN_SCOPE = "{";
     private static final String CLOSE_SCOPE = "}";
     private static final String RETURN = "\\s*return\\s*;\\s*";
-    private static final String IF_WHILE_CONDITION = "\\s*(if|while)\\s*\\(.*\\)\\s*\\{";
+    private static final String IF_WHILE = "\\s*(if|while)\\s*\\(.*\\)\\s*\\{";
     private static final String ASSIGNMENT = "\\s+(" + NAME + "\\s*=[^,;]*,\\s*)*"
             + NAME +"\\s*=[^,;]*;\\s*";
+    private static final String IF_WHILE_CONDITION =
+            "\\s*" + BOOL_VAL + "|" + NAME+ "|" + INT_VAL + "|" + DOUBLE_VAL + "\\s*";
 
-
+    private static final String TRUE = "true";
+    private static final String FALSE = "false";
     private static final String NAME_GROUP = "name";
     private static final String TYPE_GROUP = "type";
     private static final String FINAL = "final";
@@ -89,8 +93,9 @@ public class FileProcessor {
         stringValPattern = Pattern.compile(STRING_VAL);
         namePattern = Pattern.compile(NAME);
         returnPattern = Pattern.compile(RETURN);
-        ifWhilePattern = Pattern.compile(IF_WHILE_CONDITION);
-        functionCallPattern = Pattern.compile("(?<name>"+NAME+ ")\\s*\\([^)]\\)"); // Added pattern for
+        ifWhilePattern = Pattern.compile(IF_WHILE);
+        ifWhileConditionPattern = Pattern.compile(IF_WHILE_CONDITION);
+        functionCallPattern = Pattern.compile("(?<name>"+NAME+ ")\\s*\\([^)]*\\)"); // Added pattern for
         functionDefinitionPattern = Pattern.compile(METHOD_DECLARATION);
         // function
         // calls
@@ -287,11 +292,37 @@ public class FileProcessor {
             } else if (checkForAssignments(line, ind)) {
                 continue;
             } else if (ifWhilePattern.matcher(line).matches()) {
+                boolean toEnter = checkIfWhileCondition(ind, line, localVars);
                 continue;
             } else if (functionCallPattern.matcher(line).matches()) {
                 continue;
             } else if (returnPattern.matcher(line).matches()) {
                 continue;
+            } else if (functionCallPattern.matcher(line).matches()) {
+                String[] parts = line.split("\\s*\\(\\s*|\\s*\\)\\s*");
+                String funcName = parts[0].trim();
+                String[] args = parts.length > 1 ? parts[1].split(COMMA) : new String[0];
+                FunctionInfo targetFunc = null;
+                for (FunctionInfo func : functions) {
+                    if (func.getName().equals(funcName)) {
+                        targetFunc = func;
+                        break;
+                    }
+                }
+                if (targetFunc == null) {
+                    throw new Exception("Function " + funcName + " not declared in line: " + ind + "\n" +
+                            line);
+                }
+                if (args.length != targetFunc.getParameters().length) {
+                    throw new Exception("Illegal number of arguments in function call to " + funcName +
+                            " in line: " + ind + "\n" + line + "\nexpected " +
+                            targetFunc.getParameters().length + " but got " + args.length);
+                }
+                for (int i = 0; i < args.length; i++) {
+                    String arg = args[i].trim();
+                    String expectedType = targetFunc.getParameters()[i].getType();
+                    varAssignmentCheck(expectedType, arg);
+                }
             } else {
                 throw new Exception("Illegal statement in line: " + ind + "\n" + line);
             }
@@ -301,7 +332,45 @@ public class FileProcessor {
                     fileContents.get(ind));
         }
         variables.pop();
-        return ind;
+        if (variables.size() == 1 && !returnPattern.matcher(fileContents.get(ind - 1).trim()).matches()) {
+            throw new Exception("Missing return statement at the end of function in line: " + (ind - 1)
+                    + "\n" + fileContents.get(ind - 1));
+        }
+        return ind + 1;
+    }
+
+    private boolean checkIfWhileCondition(int lineNum, String line, VariableInfo[] localVars)
+            throws Exception {
+        String condition = line.substring(line.indexOf('(') + 1, line.indexOf(')')).trim();
+        boolean toEnter = false;
+        String splitType = "";
+        String[] paramsArray = condition.split("\\s+(&&|\\|\\|)\\s+");
+        if (condition.contains("&&")){
+            splitType = "&&";
+        }
+        else if (condition.contains("||")){
+            splitType = "||";
+        }
+        for (String param : paramsArray){
+            String cleanParam = param.trim();
+            if (cleanParam.isEmpty()){
+                throw new Exception("Invalid condition in if/while statement in line: " + lineNum + "\n" +
+                        line);
+            }
+            if (!ifWhileConditionPattern.matcher(cleanParam).matches()){
+                throw new Exception("Invalid condition in if/while statement in line: " + lineNum + "\n" +
+                        line);
+            }
+            toEnter = updateConditionStatus(toEnter, cleanParam, splitType, localVars);
+        }
+        return toEnter;
+    }
+
+    private boolean updateConditionStatus(boolean currentStatus, String condition,
+                                                   String splitType, VariableInfo[] localVars)
+            throws Exception {
+        //this function will check the condition and return the updated status
+        return currentStatus;
     }
 
     private boolean checkForAssignments(String line, int lineNum) throws Exception {
