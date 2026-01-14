@@ -1,5 +1,6 @@
 package ex5.Stucts;
 
+
 public class FunctionInfo {
     private final String name;
     private final VariableInfo[] parameters;

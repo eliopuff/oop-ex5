@@ -42,6 +42,7 @@ public class FileProcessor {
     private static final String COMMENT = "\\s*" + COMMENT_PREFIX + ".*";
     private static final String TYPE = "(int|boolean|char|double|String)";
     private static final String NAME = "([a-zA-Z]|_[a-zA-Z0-9])\\w*";
+    private static final String FUNCTION_CALL = "(?<name>" + NAME + ")\\s*\\([^)]*\\)\\s*;";
     private static final String METHOD_DECLARATION = "\\s*void\\s+(?<name>" + NAME + ")\\s*\\([^)]*\\)" +
             "\\s*\\{";
     private static final String VARIABLE_DECLARATION = "\\s*(final\\s+)?(?<type>" + TYPE + ")\\s+"+
@@ -62,7 +63,7 @@ public class FileProcessor {
     private static final String ASSIGNMENT = "\\s+(" + NAME + "\\s*=[^,;]*,\\s*)*"
             + NAME +"\\s*=[^,;]*;\\s*";
     private static final String IF_WHILE_CONDITION =
-            "\\s*" + BOOL_VAL + "|" + NAME+ "|" + INT_VAL + "|" + DOUBLE_VAL + "\\s*";
+            "\\s*" + BOOL_VAL + "|" + NAME+ "\\s*";
     private static final String AND_OR = "\\s+(&&|\\|\\|)\\s+";
 
     private static final String TRUE = "true";
@@ -107,17 +108,19 @@ public class FileProcessor {
         returnPattern = Pattern.compile(RETURN);
         ifWhilePattern = Pattern.compile(IF_WHILE);
         ifWhileConditionPattern = Pattern.compile(IF_WHILE_CONDITION);
-        functionCallPattern = Pattern.compile("(?<name>"+NAME+ ")\\s*\\([^)]*\\)\\s*;"); // Added pattern for
+        functionCallPattern = Pattern.compile(FUNCTION_CALL); // Added pattern for
         functionDefinitionPattern = Pattern.compile(METHOD_DECLARATION);
-        // function
-        // calls
 
         varDeclarationPattern = Pattern.compile(VARIABLE_DECLARATION);
     }
 
     public void processFile() throws Exception {
         BufferedReader bufferedReader = new BufferedReader(fileReader);
-        fileContents = bufferedReader.lines().toList();
+        fileContents = new ArrayList<>();
+        String line;
+        while ((line = bufferedReader.readLine()) != null) {
+            fileContents.add(line.trim());
+        }
         validateScopesAndColons();
         findFuncAndGlobalVars();
         System.out.println(functions);
@@ -157,20 +160,23 @@ public class FileProcessor {
             line = line.trim();
             if (line.endsWith(OPEN_SCOPE)) {
                 Matcher matcher = funcPattern.matcher(line);
-                if (matcher.matches()) {
-                    if (depth != 0) {
-                        throw new Exception("Nested functions are not allowed: " + line);
-                    }
-                    String funcName = matcher.group(NAME_GROUP);
-                    String paramsString = line.substring(line.indexOf('(') + 1, line.indexOf(')'));
-                    VariableInfo[] parameters = parseParameters(paramsString);
-                    FunctionInfo functionInfo = new FunctionInfo(funcName, parameters);
-                    for (FunctionInfo func : functions) {
-                        if (func.getName().equals(funcName)) {
-                            throw new Exception("Function '" + funcName + "' already declared: " + line);
+                if (depth == 0) {
+                    if (matcher.matches()) {
+
+                        String funcName = matcher.group(NAME_GROUP);
+                        String paramsString = line.substring(line.indexOf('(') + 1, line.indexOf(')'));
+                        VariableInfo[] parameters = parseParameters(paramsString);
+                        FunctionInfo functionInfo = new FunctionInfo(funcName, parameters);
+                        for (FunctionInfo func : functions) {
+                            if (func.getName().equals(funcName)) {
+                                throw new Exception("Function '" + funcName + "' already declared: " + line);
+                            }
                         }
+                        functions.add(functionInfo);
                     }
-                    functions.add(functionInfo);
+                    else {
+                        throw new Exception("Illegal function declaration: " + line);
+                    }
                 }
                 depth++;
             } else if (line.endsWith(CLOSE_SCOPE)) {
@@ -386,6 +392,12 @@ public class FileProcessor {
                     if (legal){
                         break;
                     }
+                }
+            }
+            if (!legal){
+                Matcher boolMatcher = boolValPattern.matcher(cleanParam);
+                if (boolMatcher.matches()){
+                    legal = true;
                 }
             }
         }
