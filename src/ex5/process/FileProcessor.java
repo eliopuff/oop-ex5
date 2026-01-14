@@ -292,8 +292,11 @@ public class FileProcessor {
             } else if (checkForAssignments(line, ind)) {
                 continue;
             } else if (ifWhilePattern.matcher(line).matches()) {
-                boolean toEnter = checkIfWhileCondition(ind, line, localVars);
-                continue;
+                boolean legal = checkIfWhileCondition(ind, line, localVars);
+                if (!legal){
+                    throw new Exception("Illegal condition in if/while statement in line: " + ind + "\n" +
+                            line);
+                }
             } else if (functionCallPattern.matcher(line).matches()) {
                 continue;
             } else if (returnPattern.matcher(line).matches()) {
@@ -342,9 +345,13 @@ public class FileProcessor {
     private boolean checkIfWhileCondition(int lineNum, String line, VariableInfo[] localVars)
             throws Exception {
         String condition = line.substring(line.indexOf('(') + 1, line.indexOf(')')).trim();
-        boolean toEnter = false;
+        boolean legal = false;
         String splitType = "";
         String[] paramsArray = condition.split("\\s+(&&|\\|\\|)\\s+");
+        if (condition.contains("&&") && condition.contains("||")){
+            throw new Exception("Mixed && and || operators in if/while condition in line: " + lineNum + "\n" +
+                    line);
+        }
         if (condition.contains("&&")){
             splitType = "&&";
         }
@@ -361,9 +368,25 @@ public class FileProcessor {
                 throw new Exception("Invalid condition in if/while statement in line: " + lineNum + "\n" +
                         line);
             }
-            toEnter = updateConditionStatus(toEnter, cleanParam, splitType, localVars);
+            if (namePattern.matcher(cleanParam).matches()){
+                for (List<VariableInfo> scopeVars : variables) {
+                    for (VariableInfo var : scopeVars) {
+                        if (var.getName().equals(cleanParam)) {
+                            if (!var.isAssigned()){
+                                throw new Exception("Unassigned variable in if/while condition in line: "
+                                        + lineNum + "\n" + line);
+                            }
+                            legal = true;
+                            break;
+                        }
+                    }
+                    if (legal){
+                        break;
+                    }
+                }
+            }
         }
-        return toEnter;
+        return legal;
     }
 
     private boolean updateConditionStatus(boolean currentStatus, String condition,
