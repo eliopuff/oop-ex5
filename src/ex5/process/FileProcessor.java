@@ -95,7 +95,7 @@ public class FileProcessor {
         returnPattern = Pattern.compile(RETURN);
         ifWhilePattern = Pattern.compile(IF_WHILE);
         ifWhileConditionPattern = Pattern.compile(IF_WHILE_CONDITION);
-        functionCallPattern = Pattern.compile("(?<name>"+NAME+ ")\\s*\\([^)]*\\)"); // Added pattern for
+        functionCallPattern = Pattern.compile("(?<name>"+NAME+ ")\\s*\\([^)]*\\)\\s*;"); // Added pattern for
         functionDefinitionPattern = Pattern.compile(METHOD_DECLARATION);
         // function
         // calls
@@ -330,15 +330,15 @@ public class FileProcessor {
                 throw new Exception("Illegal statement in line: " + ind + "\n" + line);
             }
         }
-        if (ind >= fileContents.size() || !fileContents.get(ind).equals(CLOSE_SCOPE)) {
+        if (ind >= fileContents.size() || !fileContents.get(ind).trim().equals(CLOSE_SCOPE)) {
             throw new Exception("Missing closing brace for function scope in line: " + ind +"\n" +
                     fileContents.get(ind));
         }
-        variables.pop();
         if (variables.size() == 1 && !returnPattern.matcher(fileContents.get(ind - 1).trim()).matches()) {
             throw new Exception("Missing return statement at the end of function in line: " + (ind - 1)
                     + "\n" + fileContents.get(ind - 1));
         }
+        variables.pop();
         return ind + 1;
     }
 
