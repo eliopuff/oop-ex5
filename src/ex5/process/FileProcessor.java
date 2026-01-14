@@ -63,6 +63,7 @@ public class FileProcessor {
             + NAME +"\\s*=[^,;]*;\\s*";
     private static final String IF_WHILE_CONDITION =
             "\\s*" + BOOL_VAL + "|" + NAME+ "|" + INT_VAL + "|" + DOUBLE_VAL + "\\s*";
+    private static final String AND_OR = "\\s+(&&|\\|\\|)\\s+";
 
     private static final String TRUE = "true";
     private static final String FALSE = "false";
@@ -77,6 +78,17 @@ public class FileProcessor {
     private static final String COMMA = ",";
     private static final String SEMICOLON = ";";
     private static final String ASSIGN_OP = "=";
+
+    private static final String IF_WHILE_ERROR_MSG = "ERROR: Illegal if/while condition.";
+    private static final String FUNCTION_ERROR_MSG = "ERROR: Illegal function call.";
+    private static final String VARIABLE_ERROR_MSG = "ERROR: Illegal variable assignment.";
+    private static final String MISSING_SEMICOLON_ERROR_MSG = "ERROR: Missing semicolon at the end of line.";
+    private static final String UNMATCHED_BRACE_ERROR_MSG = "ERROR: Unmatched closing brace found.";
+    private static final String NESTED_FUNCTION_ERROR_MSG = "ERROR: Nested functions are not allowed.";
+    private static final String FUNCTION_DECLARED_ERROR_MSG = "ERROR: Function already declared.";
+    private static final String GLOBAL_VAR_ERROR_MSG = "ERROR: Illegal global variable declaration.";
+    private static final String TYPE_MISMATCH_ERROR_MSG = "ERROR: Type mismatch in assignment";
+    private static final String FUNC_NOT_FOUND_ERROR_MSG = "ERROR: Function not found.";
 
 
     public FileProcessor(FileReader fileReader) {
@@ -153,6 +165,11 @@ public class FileProcessor {
                     String paramsString = line.substring(line.indexOf('(') + 1, line.indexOf(')'));
                     VariableInfo[] parameters = parseParameters(paramsString);
                     FunctionInfo functionInfo = new FunctionInfo(funcName, parameters);
+                    for (FunctionInfo func : functions) {
+                        if (func.getName().equals(funcName)) {
+                            throw new Exception("Function '" + funcName + "' already declared: " + line);
+                        }
+                    }
                     functions.add(functionInfo);
                 }
                 depth++;
@@ -285,11 +302,8 @@ public class FileProcessor {
         for (; (ind< fileContents.size()) && !fileContents.get(ind).trim().equals(CLOSE_SCOPE); ind++) {
             String line = fileContents.get(ind);
             line = line.trim();
-            if (matchDeclaration(line)) {
-                continue;
-            } else if (line.isEmpty()) {
-                continue;
-            } else if (checkForAssignments(line, ind)) {
+            if (matchDeclaration(line) || line.isEmpty() || checkForAssignments(line, ind) ||
+                    functionCallPattern.matcher(line).matches() || returnPattern.matcher(line).matches()) {
                 continue;
             } else if (ifWhilePattern.matcher(line).matches()) {
                 boolean legal = checkIfWhileCondition(ind, line, localVars);
@@ -298,34 +312,7 @@ public class FileProcessor {
                             line);
                 }
             } else if (functionCallPattern.matcher(line).matches()) {
-                continue;
-            } else if (returnPattern.matcher(line).matches()) {
-                continue;
-            } else if (functionCallPattern.matcher(line).matches()) {
-                String[] parts = line.split("\\s*\\(\\s*|\\s*\\)\\s*");
-                String funcName = parts[0].trim();
-                String[] args = parts.length > 1 ? parts[1].split(COMMA) : new String[0];
-                FunctionInfo targetFunc = null;
-                for (FunctionInfo func : functions) {
-                    if (func.getName().equals(funcName)) {
-                        targetFunc = func;
-                        break;
-                    }
-                }
-                if (targetFunc == null) {
-                    throw new Exception("Function " + funcName + " not declared in line: " + ind + "\n" +
-                            line);
-                }
-                if (args.length != targetFunc.getParameters().length) {
-                    throw new Exception("Illegal number of arguments in function call to " + funcName +
-                            " in line: " + ind + "\n" + line + "\nexpected " +
-                            targetFunc.getParameters().length + " but got " + args.length);
-                }
-                for (int i = 0; i < args.length; i++) {
-                    String arg = args[i].trim();
-                    String expectedType = targetFunc.getParameters()[i].getType();
-                    varAssignmentCheck(expectedType, arg);
-                }
+                validFuncCall(ind, line);
             } else {
                 throw new Exception("Illegal statement in line: " + ind + "\n" + line);
             }
@@ -342,22 +329,38 @@ public class FileProcessor {
         return ind + 1;
     }
 
+    private void validFuncCall(int ind, String line) throws Exception {
+        String[] parts = line.split("\\s*\\(\\s*|\\s*\\)\\s*");
+        String funcName = parts[0].trim();
+        String[] args = parts.length > 1 ? parts[1].split(COMMA) : new String[0];
+        FunctionInfo targetFunc = null;
+        for (FunctionInfo func : functions) {
+            if (func.getName().equals(funcName)) {
+                targetFunc = func;
+                break;
+            }
+        }
+        if (targetFunc == null) {
+            throw new Exception("Function " + funcName + " not declared in line: " + ind + "\n" +
+                    line);
+        }
+        if (args.length != targetFunc.getParameters().length) {
+            throw new Exception("Illegal number of arguments in function call to " + funcName +
+                    " in line: " + ind + "\n" + line + "\nexpected " +
+                    targetFunc.getParameters().length + " but got " + args.length);
+        }
+        for (int i = 0; i < args.length; i++) {
+            String arg = args[i].trim();
+            String expectedType = targetFunc.getParameters()[i].getType();
+            varAssignmentCheck(expectedType, arg);
+        }
+    }
+
     private boolean checkIfWhileCondition(int lineNum, String line, VariableInfo[] localVars)
             throws Exception {
         String condition = line.substring(line.indexOf('(') + 1, line.indexOf(')')).trim();
         boolean legal = false;
-        String splitType = "";
-        String[] paramsArray = condition.split("\\s+(&&|\\|\\|)\\s+");
-        if (condition.contains("&&") && condition.contains("||")){
-            throw new Exception("Mixed && and || operators in if/while condition in line: " + lineNum + "\n" +
-                    line);
-        }
-        if (condition.contains("&&")){
-            splitType = "&&";
-        }
-        else if (condition.contains("||")){
-            splitType = "||";
-        }
+        String[] paramsArray = condition.split(AND_OR);
         for (String param : paramsArray){
             String cleanParam = param.trim();
             if (cleanParam.isEmpty()){
@@ -442,8 +445,18 @@ public class FileProcessor {
             String varType = varMatcher.group(TYPE_GROUP);
             boolean isFinal = finalPattern.matcher(line).find();
             assert variables.peek() != null;
-            variables.peek().addAll(Arrays.asList(parseVariables(isFinal, varType,
-                    line.substring(line.indexOf(varType) + varType.length()))));
+            VariableInfo[] parsedVars = parseVariables(isFinal, varType,
+                    line.substring(line.indexOf(varType) + varType.length()));
+            for (VariableInfo newVar : parsedVars) {
+                assert variables.peek() != null;
+                for (VariableInfo existingVar : variables.peek()) {
+                    if (newVar.getName().equals(existingVar.getName())) {
+                        throw new Exception("Variable " + newVar.getName() + " already declared in the same scope: " + line);
+                    }
+                }
+            }
+            assert variables.peek() != null;
+            variables.peek().addAll(Arrays.asList(parsedVars));
             return true;
         }
         return false;
