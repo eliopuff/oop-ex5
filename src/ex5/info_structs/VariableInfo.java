@@ -1,4 +1,4 @@
-package ex5.Stucts;
+package ex5.info_structs;
 
 public class VariableInfo {
     private final String name;

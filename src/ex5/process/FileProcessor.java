@@ -1,7 +1,7 @@
 package ex5.process;
 
-import ex5.Stucts.FunctionInfo;
-import ex5.Stucts.VariableInfo;
+import ex5.info_structs.FunctionInfo;
+import ex5.info_structs.VariableInfo;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
