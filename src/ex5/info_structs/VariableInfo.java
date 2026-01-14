@@ -1,6 +1,12 @@
 package ex5.info_structs;
 
 public class VariableInfo {
+    public static final String FINAL = "final ";
+    public static final String EMPTY = "";
+    public static final String ASSIGNED = "assigned";
+    public static final String UNASSIGNED = "unassigned";
+    public static final String SPACE = " ";
+    public static final String COMMA = ", ";
     private final String name;
     private final String type;
     private final boolean isFinal;
@@ -35,8 +41,8 @@ public class VariableInfo {
 
     @Override
     public String toString() {
-        String finalStr = isFinal ? "final " : "";
-        String assignStr = didAssign ? "assigned" : "unassigned";
-        return "VariableInfo{" + finalStr + type + " " + name + ", " + assignStr + "}";
+        String finalStr = isFinal ? FINAL : EMPTY;
+        String assignStr = didAssign ? ASSIGNED : UNASSIGNED;
+        return finalStr + type + SPACE + name + COMMA + assignStr;
     }
 }

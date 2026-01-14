@@ -2,6 +2,9 @@ package ex5.info_structs;
 
 
 public class FunctionInfo {
+    public static final String COMMA = ", ";
+    public static final String OPEN = "(";
+    public static final String END = ")";
     private final String name;
     private final VariableInfo[] parameters;
 
@@ -22,14 +25,11 @@ public class FunctionInfo {
     public String toString() {
         StringBuilder paramsStr = new StringBuilder();
         for (VariableInfo param : parameters) {
-            paramsStr.append(param.toString()).append(", ");
+            paramsStr.append(param.toString()).append(COMMA);
         }
         if (!paramsStr.isEmpty()) {
             paramsStr.setLength(paramsStr.length() - 2); // Remove trailing comma and space
         }
-        return "FunctionInfo{" +
-                "'" + name + '\'' +
-                "Params:" + paramsStr +
-                "}";
+        return (name + OPEN + paramsStr + END);
     }
 }

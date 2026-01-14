@@ -5,6 +5,7 @@ import ex5.info_structs.VariableInfo;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
@@ -65,6 +66,7 @@ public class FileProcessor {
     private static final String IF_WHILE_CONDITION =
             "\\s*" + BOOL_VAL + "|" + NAME+ "\\s*";
     private static final String AND_OR = "\\s+(&&|\\|\\|)\\s+";
+    private static final String CALL_SEPARATOR = "\\s*\\(\\s*|\\s*\\)\\s*";
 
     private static final String TRUE = "true";
     private static final String FALSE = "false";
@@ -79,6 +81,8 @@ public class FileProcessor {
     private static final String COMMA = ",";
     private static final String SEMICOLON = ";";
     private static final String ASSIGN_OP = "=";
+    private static final String OPEN_PARENTH = "(";
+    private static final String CLOSE_PARENTH = ")";
 
     private static final String IF_WHILE_ERROR_MSG = "ERROR: Illegal if/while condition.";
     private static final String FUNCTION_ERROR_MSG = "ERROR: Illegal function call.";
@@ -86,10 +90,22 @@ public class FileProcessor {
     private static final String MISSING_SEMICOLON_ERROR_MSG = "ERROR: Missing semicolon at the end of line.";
     private static final String UNMATCHED_BRACE_ERROR_MSG = "ERROR: Unmatched closing brace found.";
     private static final String NESTED_FUNCTION_ERROR_MSG = "ERROR: Nested functions are not allowed.";
-    private static final String FUNCTION_DECLARED_ERROR_MSG = "ERROR: Function already declared.";
+    private static final String FUNCTION_DECLARED_ERROR_MSG = "ERROR: Function already declared. Name: ";
     private static final String GLOBAL_VAR_ERROR_MSG = "ERROR: Illegal global variable declaration.";
     private static final String TYPE_MISMATCH_ERROR_MSG = "ERROR: Type mismatch in assignment";
-    private static final String FUNC_NOT_FOUND_ERROR_MSG = "ERROR: Function not found.";
+    private static final String FUNC_NOT_FOUND_ERROR_MSG = "ERROR: Function not found. Name: ";
+    private static final String ILLEGAL_NUM_ARGS_ERROR = "ERROR: Illegal number of arguments in function " +
+            "call.";
+    private static final String ALREADY_DECLARED_ERROR_MSG = "ERROR: Variable already declared in the " +
+            "same scope.";
+    private static final String VAR_NOT_DECLARED_ERROR = "ERROR: Variable not declared.";
+    private static final String REASSIGN_VAR_ERROR_MSG = "ERROR: Cannot reassign a final variable.";
+    private static final String INVALID_IF_WHILE_ERROR_MSG = "ERROR: Invalid if/while condition.";
+    private static final String ILLEGAL_STATEMENT_ERROR_MSG = "ERROR: Illegal statement in function body.";
+    private static final String MISSING_BRACE_ERROR_MSG = "ERROR: Missing closing brace for" +
+            " function.";
+    private static final String MISSING_RETURN_ERROR_MSG = "ERROR: Missing return statement in function.";
+
 
 
     public FileProcessor(FileReader fileReader) {
@@ -114,7 +130,7 @@ public class FileProcessor {
         varDeclarationPattern = Pattern.compile(VARIABLE_DECLARATION);
     }
 
-    public void processFile() throws Exception {
+    public void processFile() throws SjavacException, IOException {
         BufferedReader bufferedReader = new BufferedReader(fileReader);
         fileContents = new ArrayList<>();
         String line;
@@ -128,7 +144,7 @@ public class FileProcessor {
         validateLegalCode();
     }
 
-    public void validateScopesAndColons() throws Exception {
+    public void validateScopesAndColons() throws SjavacException {
         int scopeCount = 0;
         for (String line : fileContents) {
             line = line.trim();
@@ -139,20 +155,20 @@ public class FileProcessor {
             } else if (line.endsWith(CLOSE_SCOPE)) {
                 scopeCount--;
                 if (scopeCount < 0) {
-                    throw new Exception("Unmatched closing brace found");
+                    throw new SjavacException(UNMATCHED_BRACE_ERROR_MSG);
                 }
             } else if (line.startsWith(COMMENT_PREFIX)){
                     continue;
             } else if (!line.endsWith(SEMICOLON) &&
                     !line.endsWith(OPEN_SCOPE) && !line.endsWith(CLOSE_SCOPE) &&
                     !functionCallPattern.matcher(line).matches()) {
-                throw new Exception("Missing semicolon at the end of line: " + line);
+                throw new SjavacException(MISSING_SEMICOLON_ERROR_MSG);
             }
         }
     }
 
 
-    private void findFuncAndGlobalVars() throws Exception {
+    private void findFuncAndGlobalVars() throws SjavacException {
         int depth = 0;
         variables.push(new ArrayList<>());
         Pattern funcPattern = Pattern.compile(METHOD_DECLARATION);
@@ -164,18 +180,19 @@ public class FileProcessor {
                     if (matcher.matches()) {
 
                         String funcName = matcher.group(NAME_GROUP);
-                        String paramsString = line.substring(line.indexOf('(') + 1, line.indexOf(')'));
+                        String paramsString = line.substring(line.indexOf(OPEN_PARENTH) + 1,
+                                line.indexOf(CLOSE_PARENTH));
                         VariableInfo[] parameters = parseParameters(paramsString);
                         FunctionInfo functionInfo = new FunctionInfo(funcName, parameters);
                         for (FunctionInfo func : functions) {
                             if (func.getName().equals(funcName)) {
-                                throw new Exception("Function '" + funcName + "' already declared: " + line);
+                                throw new SjavacException(FUNCTION_DECLARED_ERROR_MSG + funcName);
                             }
                         }
                         functions.add(functionInfo);
                     }
                     else {
-                        throw new Exception("Illegal function declaration: " + line);
+                        throw new SjavacException(FUNC_NOT_FOUND_ERROR_MSG);
                     }
                 }
                 depth++;
@@ -189,13 +206,13 @@ public class FileProcessor {
                     continue;
                 } else if (line.isEmpty()) {
                     continue;
-                }else throw new Exception("Illegal global variable declaration: " + line);
+                }else throw new SjavacException(GLOBAL_VAR_ERROR_MSG);
             }
         }
     }
 
     private VariableInfo[] parseVariables(boolean isFinal, String varType ,String paramsString)
-            throws Exception {
+            throws SjavacException {
         if (paramsString.trim().isEmpty()) {
             return new VariableInfo[0];
         }
@@ -235,7 +252,7 @@ public class FileProcessor {
         return parameters.toArray(new VariableInfo[0]);
     }
 
-    private void varAssignmentCheck(String type, String assignment) throws Exception {
+    private void varAssignmentCheck(String type, String assignment) throws SjavacException {
         switch (type) {
             case INT:
                 Matcher intMatcher = intValPattern.matcher(assignment);
@@ -278,10 +295,10 @@ public class FileProcessor {
                 }
             }
         }
-        else throw new Exception("Type mismatch in assignment");
+        else throw new SjavacException(TYPE_MISMATCH_ERROR_MSG);
     }
 
-    private void validateLegalCode() throws Exception {
+    private void validateLegalCode() throws SjavacException {
         for (int i = 0; i < fileContents.size(); i++) {
             String line = fileContents.get(i);
             line = line.trim();
@@ -296,14 +313,14 @@ public class FileProcessor {
                     }
                 }
                 if (curFunc == null) {
-                    throw new Exception("Function not found: " + funcName + "in line: " + i + "\n" + line);
+                    throw new SjavacException(FUNC_NOT_FOUND_ERROR_MSG + funcName);
                 }
                 i = validateScope(i+1, curFunc.getParameters());
             }
         }
     }
 
-    private int validateScope(int ind, VariableInfo[] localVars) throws Exception {
+    private int validateScope(int ind, VariableInfo[] localVars) throws SjavacException {
         variables.push(new ArrayList<>(Arrays.asList(localVars)));
         for (; (ind< fileContents.size()) && !fileContents.get(ind).trim().equals(CLOSE_SCOPE); ind++) {
             String line = fileContents.get(ind);
@@ -314,29 +331,26 @@ public class FileProcessor {
             } else if (ifWhilePattern.matcher(line).matches()) {
                 boolean legal = checkIfWhileCondition(ind, line, localVars);
                 if (!legal){
-                    throw new Exception("Illegal condition in if/while statement in line: " + ind + "\n" +
-                            line);
+                    throw new SjavacException(IF_WHILE_ERROR_MSG);
                 }
             } else if (functionCallPattern.matcher(line).matches()) {
                 validFuncCall(ind, line);
             } else {
-                throw new Exception("Illegal statement in line: " + ind + "\n" + line);
+                throw new SjavacException(ILLEGAL_STATEMENT_ERROR_MSG);
             }
         }
         if (ind >= fileContents.size() || !fileContents.get(ind).trim().equals(CLOSE_SCOPE)) {
-            throw new Exception("Missing closing brace for function scope in line: " + ind +"\n" +
-                    fileContents.get(ind));
+            throw new SjavacException(MISSING_BRACE_ERROR_MSG);
         }
         if (variables.size() == 1 && !returnPattern.matcher(fileContents.get(ind - 1).trim()).matches()) {
-            throw new Exception("Missing return statement at the end of function in line: " + (ind - 1)
-                    + "\n" + fileContents.get(ind - 1));
+            throw new SjavacException(MISSING_RETURN_ERROR_MSG);
         }
         variables.pop();
         return ind + 1;
     }
 
-    private void validFuncCall(int ind, String line) throws Exception {
-        String[] parts = line.split("\\s*\\(\\s*|\\s*\\)\\s*");
+    private void validFuncCall(int ind, String line) throws SjavacException {
+        String[] parts = line.split(CALL_SEPARATOR);
         String funcName = parts[0].trim();
         String[] args = parts.length > 1 ? parts[1].split(COMMA) : new String[0];
         FunctionInfo targetFunc = null;
@@ -347,13 +361,10 @@ public class FileProcessor {
             }
         }
         if (targetFunc == null) {
-            throw new Exception("Function " + funcName + " not declared in line: " + ind + "\n" +
-                    line);
+            throw new SjavacException(FUNC_NOT_FOUND_ERROR_MSG);
         }
         if (args.length != targetFunc.getParameters().length) {
-            throw new Exception("Illegal number of arguments in function call to " + funcName +
-                    " in line: " + ind + "\n" + line + "\nexpected " +
-                    targetFunc.getParameters().length + " but got " + args.length);
+            throw new SjavacException(ILLEGAL_NUM_ARGS_ERROR);
         }
         for (int i = 0; i < args.length; i++) {
             String arg = args[i].trim();
@@ -363,27 +374,24 @@ public class FileProcessor {
     }
 
     private boolean checkIfWhileCondition(int lineNum, String line, VariableInfo[] localVars)
-            throws Exception {
-        String condition = line.substring(line.indexOf('(') + 1, line.indexOf(')')).trim();
+            throws SjavacException {
+        String condition = line.substring(line.indexOf(OPEN_PARENTH) + 1, line.indexOf(CLOSE_PARENTH)).trim();
         boolean legal = false;
         String[] paramsArray = condition.split(AND_OR);
         for (String param : paramsArray){
             String cleanParam = param.trim();
             if (cleanParam.isEmpty()){
-                throw new Exception("Invalid condition in if/while statement in line: " + lineNum + "\n" +
-                        line);
+                throw new SjavacException(INVALID_IF_WHILE_ERROR_MSG);
             }
             if (!ifWhileConditionPattern.matcher(cleanParam).matches()){
-                throw new Exception("Invalid condition in if/while statement in line: " + lineNum + "\n" +
-                        line);
+                throw new SjavacException(INVALID_IF_WHILE_ERROR_MSG);
             }
             if (namePattern.matcher(cleanParam).matches()){
                 for (List<VariableInfo> scopeVars : variables) {
                     for (VariableInfo var : scopeVars) {
                         if (var.getName().equals(cleanParam)) {
                             if (!var.isAssigned()){
-                                throw new Exception("Unassigned variable in if/while condition in line: "
-                                        + lineNum + "\n" + line);
+                                throw new SjavacException(INVALID_IF_WHILE_ERROR_MSG);
                             }
                             legal = true;
                             break;
@@ -404,14 +412,8 @@ public class FileProcessor {
         return legal;
     }
 
-    private boolean updateConditionStatus(boolean currentStatus, String condition,
-                                                   String splitType, VariableInfo[] localVars)
-            throws Exception {
-        //this function will check the condition and return the updated status
-        return currentStatus;
-    }
 
-    private boolean checkForAssignments(String line, int lineNum) throws Exception {
+    private boolean checkForAssignments(String line, int lineNum) throws SjavacException {
         Pattern assignmentPattern = Pattern.compile(ASSIGNMENT);
         Matcher assignmentMatcher = assignmentPattern.matcher(line);
         if (assignmentMatcher.matches()) {
@@ -423,8 +425,7 @@ public class FileProcessor {
                 String assignment = parts[1].trim();
                 VariableInfo targetVar = getVariableInfo(line, lineNum, varName);
                 if (targetVar.isFinal()) {
-                    throw new Exception("Cannot reassign final variable " + varName + " in line: " +
-                            lineNum + "\n" + line);
+                    throw new SjavacException(REASSIGN_VAR_ERROR_MSG);
                 }
                 varAssignmentCheck(targetVar.getType(), assignment);
                 targetVar.setAssigned(true);
@@ -434,7 +435,7 @@ public class FileProcessor {
         return false;
     }
 
-    private VariableInfo getVariableInfo(String line, int lineNum, String varName) throws Exception {
+    private VariableInfo getVariableInfo(String line, int lineNum, String varName) throws SjavacException {
         VariableInfo targetVar = null;
         for (List<VariableInfo> scopeVars : variables) {
             for (VariableInfo var : scopeVars) {
@@ -445,13 +446,12 @@ public class FileProcessor {
             }
         }
         if (targetVar == null) {
-            throw new Exception("Variable " + varName + " not declared in line: " + lineNum + "\n"
-                    + line);
+            throw new SjavacException(VAR_NOT_DECLARED_ERROR);
         }
         return targetVar;
     }
 
-    private boolean matchDeclaration(String line) throws Exception {
+    private boolean matchDeclaration(String line) throws SjavacException {
         Matcher varMatcher = varDeclarationPattern.matcher(line);
         if (varMatcher.matches()) {
             String varType = varMatcher.group(TYPE_GROUP);
@@ -463,7 +463,7 @@ public class FileProcessor {
                 assert variables.peek() != null;
                 for (VariableInfo existingVar : variables.peek()) {
                     if (newVar.getName().equals(existingVar.getName())) {
-                        throw new Exception("Variable " + newVar.getName() + " already declared in the same scope: " + line);
+                        throw new SjavacException(ALREADY_DECLARED_ERROR_MSG);
                     }
                 }
             }
