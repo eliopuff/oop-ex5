@@ -7,7 +7,11 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.regex.Pattern;
 
-
+/**
+ * The main class for the Sjavac compiler.
+ * It processes a source file and outputs the result of the compilation.
+ * @author eliooo,sagig
+ */
 public class Sjavac {
     private final static String ARG_ERROR_MSG = "ERROR: Illegal number of arguments.";
     private final static String FILE_FORMAT_ERROR_MSG = "ERROR: Illegal file format. Expected a .sjavac " +
@@ -17,6 +21,10 @@ public class Sjavac {
     private final static int IO_ERROR_PRINT = 2;
     private final static String REGEX_FILE_FORMAT = ".*\\.sjava$";
 
+    /**
+     * The main method for the Sjavac compiler. throws SjavacException if the source file is illegal.
+     * @param args Command line arguments. Expects a single argument: the source file name.
+     */
     public static void main(String[] args) {
         if (args.length != 1){
             System.out.println(IO_ERROR_PRINT);
@@ -41,7 +49,7 @@ public class Sjavac {
         }
         catch (SjavacException e) {
             e.printStackTrace();
-            System.out.println(ILLEGAL_PRINT);;
+            System.out.println(ILLEGAL_PRINT);
         }
     }
 }

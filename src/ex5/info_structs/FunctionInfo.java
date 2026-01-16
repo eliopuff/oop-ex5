@@ -1,6 +1,9 @@
 package ex5.info_structs;
 
-
+/**
+ * A class representing information about a function, including its name and parameters.
+ * @author eliooo,sagig
+ */
 public class FunctionInfo {
     public static final String COMMA = ", ";
     public static final String OPEN = "(";
@@ -8,19 +11,34 @@ public class FunctionInfo {
     private final String name;
     private final VariableInfo[] parameters;
 
+    /**
+     * Constructor for FunctionInfo.
+     * @param name The name of the function.
+     * @param parameters An array of VariableInfo representing the function's parameters.
+     */
     public FunctionInfo(String name, VariableInfo[] parameters) {
         this.name = name;
         this.parameters = parameters.clone();
     }
 
+    /** Getter for the function name.
+     * @return The name of the function.
+     */
     public String getName() {
         return name;
     }
 
+    /** Getter for the function parameters.
+     * @return An array of VariableInfo representing the function's parameters.
+     */
     public VariableInfo[] getParameters() {
         return parameters.clone();
     }
 
+    /**
+     * Returns a string representation of the function, including its name and parameters.
+     * @return A string representing the function.
+     */
     @Override
     public String toString() {
         StringBuilder paramsStr = new StringBuilder();

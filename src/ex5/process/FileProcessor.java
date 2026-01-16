@@ -14,6 +14,11 @@ import java.util.LinkedList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * A class responsible for processing and validating the contents of a source file.
+ * It checks for correct syntax, variable declarations, function definitions, and scopes.
+ * @author eliooo,sagig
+ */
 public class FileProcessor {
 
 
@@ -108,6 +113,10 @@ public class FileProcessor {
 
 
 
+    /**
+     * Constructor for FileProcessor. Initiates all the pattern compilers for regex
+     * @param fileReader A FileReader object to read the source file.
+     */
     public FileProcessor(FileReader fileReader) {
         this.fileReader= fileReader;
         functions = new ArrayList<>();
@@ -130,6 +139,11 @@ public class FileProcessor {
         varDeclarationPattern = Pattern.compile(VARIABLE_DECLARATION);
     }
 
+    /**
+     * Processes the source file, validating its contents for correct syntax and structure.
+     * @throws SjavacException if any syntax or structural errors are found in the source file.
+     * @throws IOException if an I/O error occurs while reading the file.
+     */
     public void processFile() throws SjavacException, IOException {
         BufferedReader bufferedReader = new BufferedReader(fileReader);
         fileContents = new ArrayList<>();
@@ -144,6 +158,11 @@ public class FileProcessor {
         validateLegalCode();
     }
 
+    /**
+     * Validates that all scopes are properly opened and closed,
+     * and that lines end with the correct characters (semicolons, braces).
+     * @throws SjavacException if unmatched braces or missing semicolons are found.
+     */
     public void validateScopesAndColons() throws SjavacException {
         int scopeCount = 0;
         for (String line : fileContents) {
