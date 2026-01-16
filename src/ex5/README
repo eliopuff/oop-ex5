@@ -1,0 +1,23 @@
+eliooo,sagig
+327122198,318674348
+
+the two main RegEx expressions we used were:
+1. NAME = "([a-zA-Z]|_[a-zA-Z0-9])\\w*"
+this regex includes in it all possible name compositions, i.e. letters (both uppercase and lowercase),
+digits and underscores. It also ensures that the name starts with either a letter or an underscore. After
+that, any amount of "word" characters can follow.
+2. METHOD_DECLARATION = "\\s*void\\s+(?<name>" + NAME + ")\\s*\\([^)]*\\)" + "\\s*\\{"
+this regex is used to identify method declarations. It starts by allowing optional whitespace, mandatory void
+as dictated by the exercise, then it captures the first part of the expression in a group, and follows is the
+method name using the previously defined NAME regex. After that, it allows for optional whitespace, an opening
+ parenthesis, any characters that are not a closing parenthesis (to account for parameters), a closing
+ parenthesis, optional whitespace, and finally an opening curly brace to signify the start of the method body.
+
+our code's logic, which is contained in the FileProcessor class, takes care of checking the code is legal by
+doing 3 passes over the code: first to make sure all the lines end with a legal ending, next to store all our
+values and functions, and last to make sure we made legal assignments and uses of our values and functions. in
+ our design we decided to create classes for function info and variable info, so that it will be simpler to
+ keep track with data structures of the variables and functions we have already seen.
+our exception class SjavacException catches all the illegal cases we could think of, and each prints a
+different message to help the user understand what went wrong.
+
