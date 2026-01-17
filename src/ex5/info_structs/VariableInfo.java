@@ -7,12 +7,12 @@ package ex5.info_structs;
  * @author eliooo,sagig
  */
 public class VariableInfo {
-    public static final String FINAL = "final ";
-    public static final String EMPTY = "";
-    public static final String ASSIGNED = "assigned";
-    public static final String UNASSIGNED = "unassigned";
-    public static final String SPACE = " ";
-    public static final String COMMA = ", ";
+    private static final String FINAL = "final ";
+    private static final String EMPTY = "";
+    private static final String ASSIGNED = "assigned";
+    private static final String UNASSIGNED = "unassigned";
+    private static final String SPACE = " ";
+    private static final String COMMA = ", ";
     private final String name;
     private final String type;
     private final boolean isFinal;

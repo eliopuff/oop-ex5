@@ -5,9 +5,9 @@ package ex5.info_structs;
  * @author eliooo,sagig
  */
 public class FunctionInfo {
-    public static final String COMMA = ", ";
-    public static final String OPEN = "(";
-    public static final String END = ")";
+    private static final String COMMA = ", ";
+    private static final String OPEN = "(";
+    private static final String END = ")";
     private final String name;
     private final VariableInfo[] parameters;
 
