@@ -153,8 +153,6 @@ public class FileProcessor {
         }
         validateScopesAndColons();
         findFuncAndGlobalVars();
-        System.out.println(functions);
-        System.out.println(variables);
         validateLegalCode();
     }
 
