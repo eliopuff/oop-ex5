@@ -44,11 +44,11 @@ public class Sjavac {
             System.out.println(LEGAL_PRINT);
         }
         catch (IOException e) {
-            e.printStackTrace();
+            System.err.println(e.getMessage());
             System.out.println(IO_ERROR_PRINT);
         }
         catch (SjavacException e) {
-            e.printStackTrace();
+            System.err.println(e.getMessage());
             System.out.println(ILLEGAL_PRINT);
         }
     }
