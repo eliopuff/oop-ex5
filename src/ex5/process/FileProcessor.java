@@ -312,7 +312,7 @@ public class FileProcessor {
                 }
             }
         }
-        else throw new SjavacException(TYPE_MISMATCH_ERROR_MSG);
+        throw new SjavacException(TYPE_MISMATCH_ERROR_MSG);
     }
 
     private void validateLegalCode() throws SjavacException {
